@@ -1,0 +1,144 @@
+package {
+  import com.aratush.ane.toast.ToastExtension;
+  import controls.OnScreenControlsLayer;
+  import controls.TextLabel;
+  import flash.desktop.NativeApplication;
+  import flash.display.*;
+  import flash.events.*;
+  import flash.net.*;
+  import flash.system.*;
+  import flash.utils.*;
+  import gamepad.TankiGamepadHandler;
+  import lang.t;
+
+  public class ProTankiAndroid extends Sprite {
+
+    private static const IDLE_TIMEOUT:int = 1500;
+
+    private static const resourceUrlMirrors:Vector.<String> = Vector.<String>([
+          'http://tankiresources.com',
+          'http://194.67.196.216',
+          'https://s.pro-tanki.com'
+        ]);
+
+    private var currentMirrorIndex:int = 0;
+
+    private function get resourceUrl():String {
+      return resourceUrlMirrors[currentMirrorIndex];
+    }
+
+    private var timeoutId:uint;
+    private var urlloader:URLLoader;
+
+    public function ProTankiAndroid() {
+      super();
+      addEventListener(Event.ADDED_TO_STAGE,init);
+    }
+
+    private function init(event:Event):void {
+      removeEventListener(Event.ADDED_TO_STAGE,init);
+      stage.scaleMode = StageScaleMode.NO_SCALE;
+      stage.align = StageAlign.TOP_LEFT;
+      new TankiGamepadHandler(stage).init();
+      loadTankiLoader();
+      checkInstalledAPK();
+    }
+
+    private function checkInstalledAPK():void {
+      if(!Capabilities.supports64BitProcesses) {
+        return;
+      }
+      var descriptor:XML = NativeApplication.nativeApplication.applicationDescriptor;
+      var ns:Namespace = descriptor.namespace ();
+      var buildArch:String = descriptor.ns::android.ns::buildArchitectures;
+      if(buildArch.startsWith("armv7")) {
+        if(ToastExtension.isSupported) {
+          var toast:ToastExtension = new ToastExtension();
+          toast.setText(t('abi_mismatch_warning'));
+          toast.show();
+        }
+      }
+    }
+
+    private function loadTankiLoader():void {
+      trace('Trying resourceUrl',resourceUrl);
+      urlloader = new URLLoader();
+      urlloader.dataFormat = URLLoaderDataFormat.BINARY;
+      urlloader.addEventListener(IOErrorEvent.IO_ERROR,onLoadingError);
+      urlloader.addEventListener(SecurityErrorEvent.SECURITY_ERROR,onLoadingError);
+      urlloader.addEventListener(ProgressEvent.PROGRESS,onProgress);
+      urlloader.addEventListener(Event.COMPLETE,onUrlloaderComplete);
+      urlloader.load(new URLRequest(resourceUrl + '/Loader.swf'));
+      renewTimeout();
+    }
+
+    private function renewTimeout():void {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(onLoadingError,IDLE_TIMEOUT);
+    }
+
+    private function onProgress(event:Event):void {
+      renewTimeout();
+    }
+
+    private function onLoadingError(event:Event = null):void {
+      cleanupUrlloader();
+      tryNextUrl();
+    }
+
+    private function cleanupUrlloader():void {
+      clearTimeout(timeoutId);
+      urlloader.close();
+      urlloader.removeEventListener(IOErrorEvent.IO_ERROR,onLoadingError);
+      urlloader.removeEventListener(SecurityErrorEvent.SECURITY_ERROR,onLoadingError);
+      urlloader.removeEventListener(ProgressEvent.PROGRESS,onProgress);
+      urlloader.removeEventListener(Event.COMPLETE,onUrlloaderComplete);
+      urlloader = null;
+    }
+
+    private function tryNextUrl():void {
+      currentMirrorIndex++;
+      if(currentMirrorIndex < resourceUrlMirrors.length) {
+        loadTankiLoader();
+      }
+      else {
+        var errorLabel:TextLabel = new TextLabel(t('loading_error'),42,0xCCCCCC);
+        errorLabel.x = errorLabel.y = 50;
+        addChild(errorLabel);
+      }
+    }
+
+    private function onUrlloaderComplete(event:Event):void {
+      var loader:Loader = new Loader();
+      var context:LoaderContext = new LoaderContext(false,ApplicationDomain.currentDomain);
+      context.parameters = {
+          resources: resourceUrl,
+          config: resourceUrl + '/config.xml',
+          swf: resourceUrl + '/library.swf',
+          lang: t('_game_locale')
+        };
+      context.allowCodeImport = true;
+      loader.contentLoaderInfo.addEventListener(Event.COMPLETE,onComplete);
+      loader.loadBytes(urlloader.data as ByteArray,context);
+      cleanupUrlloader();
+    }
+
+    private function onComplete(event:Event):void {
+      var contentLoaderInfo:LoaderInfo = event.target as LoaderInfo;
+      contentLoaderInfo.removeEventListener(Event.COMPLETE,onComplete);
+      addChild(contentLoaderInfo.loader);
+
+      Feature::on_screen_controls {
+        stage.addChild(new OnScreenControlsLayer());
+      }
+    }
+
+    /**
+     * Invoked by the game
+     */
+    public function closeLauncher():void {
+      NativeApplication.nativeApplication.exit();
+    }
+
+  }
+}

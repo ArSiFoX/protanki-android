@@ -1,0 +1,51 @@
+{
+  "config": "airmobile",
+  "compilerOptions": {
+    "source-path": [
+      "src"
+    ],
+    "library-path": [],
+    "external-library-path": [
+      "libs/Toast-ANE/ane/bin/Toast.ane"
+    ],
+    "default-background-color": "#000000",
+    "define": [
+      {
+        "name": "Feature::on_screen_controls",
+        "value": true
+      }
+    ],
+    "output": "bin/protanki-android.swf",
+    "creator": "pngdrift"
+  },
+  "application": "src/ProTankiAndroid-app.xml",
+  "mainClass": "ProTankiAndroid",
+  "airOptions": {
+    "android": {
+      "output": "bin/protanki-android.apk",
+      "arch": "armv8",
+      "signingOptions": {
+        "storetype": "pkcs12",
+        "keystore": "certs/android_certificate.p12"
+      }
+    },
+    "extdir": [
+      "libs/Toast-ANE/ane/bin/"
+    ],
+    "files": [
+      {
+        "file": "icons/icon_96.png",
+        "path": "icons/icon_96.png"
+      },
+      {
+        "file": "icons/icon_144.png",
+        "path": "icons/icon_144.png"
+      },
+      {
+        "file": "icons/icon_192.png",
+        "path": "icons/icon_192.png"
+      }
+    ]
+  },
+  "additionalOptions": "-inline"
+}
