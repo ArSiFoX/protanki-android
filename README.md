@@ -1,10 +1,11 @@
 # ProTankiAndroid - Fork with internal controls
 
-Forked from https://github.com/pngdrift/protanki-android/blob/main/LICENSE
 ![Logo](icons/icon_96.png)
 [![Version Badge](https://img.shields.io/github/v/release/ArSiFoX/protanki-android?style=plastic)](https://github.com/ArSiFoX/protanki-android/releases/latest)
 
 Launcher to start [ProTanki](https://pro-tanki.online) on Android devices using Adobe AIR.
+
+Forked from https://github.com/pngdrift/protanki-android/blob/main/LICENSE
 
 [!NOTE]
 This fork includes an on-screen keyboard, allowing you to play battles directly on Android devices without a physical keyboard.
