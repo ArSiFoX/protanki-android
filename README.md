@@ -5,7 +5,7 @@
 
 Launcher to start [ProTanki](https://pro-tanki.online) on Android devices using Adobe AIR.
 
-Forked from https://github.com/pngdrift/protanki-android/blob/main/LICENSE
+Forked from https://github.com/pngdrift/protanki-android/
 
 [!NOTE]
 This fork includes an on-screen keyboard, allowing you to play battles directly on Android devices without a physical keyboard.
