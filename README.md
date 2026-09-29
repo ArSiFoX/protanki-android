@@ -1,7 +1,8 @@
-# ProTankiAndroid - Fork with internal 
+# ProTankiAndroid - Fork with internal controls
 
+Forked from https://github.com/pngdrift/protanki-android/blob/main/LICENSE
 ![Logo](icons/icon_96.png)
-[![Version Badge](https://img.shields.io/github/v/release/pngdrift/protanki-android?style=plastic)](https://github.com/pngdrift/protanki-android/releases/latest)
+[![Version Badge](https://img.shields.io/github/v/release/pngdrift/protanki-android?style=plastic)](https://github.com/ArSiFoX/protanki-android/releases/latest)
 
 Launcher to start [ProTanki](https://pro-tanki.online) on Android devices using Adobe AIR.
 
