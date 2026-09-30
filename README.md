@@ -59,7 +59,8 @@ asconfigc --sdk-path %AIR_HOME% --air android
 
 You will be prompted for the certificate password during the build process.
 
-================================================================================================================================================================
+
+
 
 # ProTankiAndroid — форк с экранной клавиатурой
 
