@@ -61,6 +61,10 @@ You will be prompted for the certificate password during the build process.
 
 </br>
 
+![On-screen controls](screenshots/controls.png)
+
+</br>
+
 # ProTankiAndroid — форк с экранной клавиатурой
 
 ![Logo](icons/icon_96.png)
@@ -92,7 +96,7 @@ You will be prompted for the certificate password during the build process.
 
 ## 📲 Скачать
 
-Скачайте последнюю версию APK со страницы [Releases](https://github.com/pngdrift/protanki-android/releases/latest).
+Скачайте последнюю версию APK со страницы [Releases](https://github.com/ArSiFoX/protanki-android/releases/latest).
 
 ## 🛠️ Сборка из исходного кода
 
