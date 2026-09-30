@@ -7,8 +7,8 @@ Launcher to start [ProTanki](https://pro-tanki.online) on Android devices using 
 
 Forked from https://github.com/pngdrift/protanki-android/
 
-[!NOTE]
-This fork includes an on-screen keyboard, allowing you to play battles directly on Android devices without a physical keyboard.
+> [!NOTE]
+> This fork includes an on-screen keyboard, allowing you to play battles directly on Android devices without a physical keyboard.
 
 You can also connect a gamepad and use the control mapping below.
 ## 🎮 Gamepad Controls Mapping
