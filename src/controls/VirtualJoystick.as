@@ -1,6 +1,7 @@
 package controls {
   import flash.display.Sprite;
   import flash.display.Stage;
+  import flash.events.Event;
   import flash.geom.Point;
   import flash.ui.Keyboard;
 
@@ -21,6 +22,13 @@ package controls {
     private var currentS:Boolean = false;
     private var currentD:Boolean = false;
 
+    private var joystickSens:Number = 1.0;
+    private var currentSteerRate:Number = 0.0;
+    private var currentSteerDir:String = "";
+    private var pwmAccumulator:Number = 0.0;
+    private var wantW:Boolean = false;
+    private var wantS:Boolean = false;
+
     public function VirtualJoystick(stage:Stage, radius:Number = 0) {
       super();
       this.stageRef = stage;
@@ -32,6 +40,11 @@ package controls {
       createUI();
       buttonMode = true;
       mouseChildren = false;
+      addEventListener(Event.REMOVED_FROM_STAGE, onRemovedFromStage);
+    }
+
+    private function onRemovedFromStage(e:Event):void {
+      reset();
     }
 
     private function createUI():void {
@@ -107,6 +120,8 @@ package controls {
       if (dist <= baseRadius * 1.3) {
         activeTouchId = touchId;
         drawKnob(true);
+        pwmAccumulator = 0.0;
+        addEventListener(Event.ENTER_FRAME, onEnterFrame);
         updateMovement(localPt.x, localPt.y);
         return true;
       }
@@ -132,7 +147,33 @@ package controls {
       knob.x = 0;
       knob.y = 0;
       drawKnob(false);
-      setKeys(false, false, false, false);
+      removeEventListener(Event.ENTER_FRAME, onEnterFrame);
+
+      wantW = false;
+      wantS = false;
+      currentSteerRate = 0.0;
+      currentSteerDir = "";
+      pwmAccumulator = 0.0;
+
+      var s:Stage = stageRef != null ? stageRef : this.stage;
+      if (s != null) {
+        if (currentW) {
+          currentW = false;
+          KeyUtil.simulateKeyPress(s, false, Keyboard.W);
+        }
+        if (currentS) {
+          currentS = false;
+          KeyUtil.simulateKeyPress(s, false, Keyboard.S);
+        }
+        if (currentA) {
+          currentA = false;
+          KeyUtil.simulateKeyPress(s, false, Keyboard.A);
+        }
+        if (currentD) {
+          currentD = false;
+          KeyUtil.simulateKeyPress(s, false, Keyboard.D);
+        }
+      }
     }
 
     private function updateMovement(localX:Number, localY:Number):void {
@@ -145,35 +186,49 @@ package controls {
       knob.x = localX;
       knob.y = localY;
 
-      var wantW:Boolean = false;
-      var wantS:Boolean = false;
-      var wantA:Boolean = false;
-      var wantD:Boolean = false;
+      wantW = false;
+      wantS = false;
+      currentSteerRate = 0.0;
+      currentSteerDir = "";
 
       if (dist >= deadZone) {
         var angleDeg:Number = Math.atan2(localY, localX) * 180 / Math.PI;
-        // UP: [-157.5, -22.5]
-        if (angleDeg >= -157.5 && angleDeg <= -22.5) {
+
+        // Drive forward W: angle in [-165, -15]
+        if (angleDeg >= -165 && angleDeg <= -15) {
           wantW = true;
         }
-        // DOWN: [22.5, 157.5]
-        if (angleDeg >= 22.5 && angleDeg <= 157.5) {
+        // Drive reverse S: angle in [15, 165]
+        if (angleDeg >= 15 && angleDeg <= 165) {
           wantS = true;
         }
-        // RIGHT: [-67.5, 67.5]
-        if (angleDeg >= -67.5 && angleDeg <= 67.5) {
-          wantD = true;
-        }
-        // LEFT: <= -112.5 or >= 112.5
-        if (angleDeg <= -112.5 || angleDeg >= 112.5) {
-          wantA = true;
+
+        // Steering: pure forward is -90 deg, pure reverse is +90 deg.
+        // Deadzone cone: 18 degrees around vertical forward/backward
+        var absAngle:Number = Math.abs(angleDeg);
+        var devFromVertical:Number = Math.abs(absAngle - 90); // 0 at pure vertical, 90 at pure horizontal
+
+        var deadzoneCone:Number = 18.0;
+        if (devFromVertical > deadzoneCone) {
+          var angleFactor:Number = (devFromVertical - deadzoneCone) / (90.0 - deadzoneCone);
+          var distFactor:Number = (dist - deadZone) / (maxDistance - deadZone);
+          distFactor = Math.max(0.0, Math.min(1.0, distFactor));
+
+          var rawSteer:Number = angleFactor * distFactor;
+          currentSteerRate = Math.max(0.0, Math.min(1.0, rawSteer * joystickSens));
+
+          if (localX > 0) {
+            currentSteerDir = "D";
+          } else if (localX < 0) {
+            currentSteerDir = "A";
+          }
         }
       }
 
-      setKeys(wantW, wantA, wantS, wantD);
+      syncDriveKeys();
     }
 
-    private function setKeys(wantW:Boolean, wantA:Boolean, wantS:Boolean, wantD:Boolean):void {
+    private function syncDriveKeys():void {
       var s:Stage = stageRef != null ? stageRef : this.stage;
       if (s == null) {
         return;
@@ -186,6 +241,36 @@ package controls {
         currentS = wantS;
         KeyUtil.simulateKeyPress(s, currentS, Keyboard.S);
       }
+    }
+
+    private function onEnterFrame(event:Event):void {
+      if (activeTouchId == -1) {
+        removeEventListener(Event.ENTER_FRAME, onEnterFrame);
+        return;
+      }
+      var s:Stage = stageRef != null ? stageRef : this.stage;
+      if (s == null) {
+        return;
+      }
+
+      var steerKeyDown:Boolean = false;
+      if (currentSteerRate >= 0.90) {
+        steerKeyDown = true;
+      } else if (currentSteerRate <= 0.05) {
+        steerKeyDown = false;
+      } else {
+        pwmAccumulator += currentSteerRate;
+        if (pwmAccumulator >= 1.0) {
+          pwmAccumulator -= 1.0;
+          steerKeyDown = true;
+        } else {
+          steerKeyDown = false;
+        }
+      }
+
+      var wantA:Boolean = (currentSteerDir == "A") && steerKeyDown;
+      var wantD:Boolean = (currentSteerDir == "D") && steerKeyDown;
+
       if (wantA != currentA) {
         currentA = wantA;
         KeyUtil.simulateKeyPress(s, currentA, Keyboard.A);
@@ -194,6 +279,14 @@ package controls {
         currentD = wantD;
         KeyUtil.simulateKeyPress(s, currentD, Keyboard.D);
       }
+    }
+
+    public function setJoystickSens(sens:Number):void {
+      this.joystickSens = Math.max(0.2, Math.min(2.5, sens));
+    }
+
+    public function getJoystickSens():Number {
+      return this.joystickSens;
     }
 
     public function getActiveTouchId():int {

@@ -34,7 +34,9 @@ package controls {
     private var isDpadEnabled:Boolean = false;
     private var isTouchCameraEnabled:Boolean = true;
     private var isTurretButtonsEnabled:Boolean = true;
+    private var isQEButtonsEnabled:Boolean = false;
     private var isFire2Enabled:Boolean = true;
+    private var isAimWhileShootingEnabled:Boolean = true;
     private var isCombineSuppliesEnabled:Boolean = false;
     private var isVerticalCameraDisabled:Boolean = false;
 
@@ -45,6 +47,7 @@ package controls {
     private var buttonsAlpha:Number = 1.0;
     private var cameraSensH:Number = 1.0;
     private var cameraSensV:Number = 1.0;
+    private var joystickSens:Number = 1.0;
 
     private var selectedElement:Sprite = null;
     private var buttonScales:Object = {};
@@ -53,7 +56,15 @@ package controls {
     private var cameraTouchId:int = -1;
     private var cameraLastX:Number = 0;
     private var cameraLastY:Number = 0;
+    private var simulatedMouseX:Number = 0;
+    private var simulatedMouseY:Number = 0;
     private var lastCameraMoveTime:int = 0;
+
+    // Aim while shooting variables
+    private var fireAimTouchId:int = -1;
+    private var fireAimButton:ControlButton = null;
+    private var fireAimLastX:Number = 0;
+    private var fireAimLastY:Number = 0;
 
     private var cameraBudgetX:Number = 0;
     private var cameraBudgetY:Number = 0;
@@ -62,6 +73,8 @@ package controls {
     private var cameraKeyXPressed:Boolean = false;
     private var cameraKeyPageUpPressed:Boolean = false;
     private var cameraKeyPageDownPressed:Boolean = false;
+    private var cameraKeyQPressed:Boolean = false;
+    private var cameraKeyEPressed:Boolean = false;
 
     public function OnScreenControlsLayer() {
       super();
@@ -97,6 +110,13 @@ package controls {
         releaseAllButtons();
         releaseCameraKeys();
         cameraTouchId = -1;
+        if (fireAimTouchId != -1) {
+          if (fireAimButton != null) {
+            setButtonState(fireAimButton, false);
+            fireAimButton = null;
+          }
+          fireAimTouchId = -1;
+        }
       } else {
         selectElement(null);
       }
@@ -140,6 +160,12 @@ package controls {
       var xY:Number = zY;
       var cX:Number = zX + (zSize + DPI.scale(10)) / 2;
       var cY:Number = zY - buttonSizes[0] - DPI.scale(10);
+
+      // Vertical camera Q (Down) and E (Up) (Above Z and X)
+      var qX:Number = zX;
+      var qY:Number = zY - zSize - DPI.scale(12);
+      var eX:Number = xX;
+      var eY:Number = qY;
 
       // F (Drop Flag) (Above Space)
       var fSize:Number = buttonSizes[0];
@@ -185,6 +211,8 @@ package controls {
         Z: new Point(zX, zY),
         X: new Point(xX, xY),
         C: new Point(cX, cY),
+        Q: new Point(qX, qY),
+        E: new Point(eX, eY),
 
         W: new Point(leftX, baseY - buttonSizes[1]),
         A: new Point(leftX - buttonSizes[1], baseY),
@@ -233,11 +261,20 @@ package controls {
       releaseAllButtons();
       releaseCameraKeys();
       cameraTouchId = -1;
+      if (fireAimTouchId != -1) {
+        if (fireAimButton != null) {
+          setButtonState(fireAimButton, false);
+          fireAimButton = null;
+        }
+        fireAimTouchId = -1;
+      }
     }
 
     private function onEnterFrame(event:Event):void {
+      if (stage == null) return;
+
       // Drain horizontal budget (X / Z)
-      var drainRateX:Number = 2.4;
+      var drainRateX:Number = 1.0;
       if (cameraBudgetX > 0.4) {
         if (!cameraKeyXPressed) {
           KeyUtil.simulateKeyPress(stage, true, Keyboard.X);
@@ -272,37 +309,31 @@ package controls {
         cameraBudgetX = 0;
       }
 
-      // Drain vertical budget (PAGE_DOWN / PAGE_UP)
-      if (isVerticalCameraDisabled) {
-        if (cameraKeyPageDownPressed) {
-          KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_DOWN);
-          cameraKeyPageDownPressed = false;
-        }
-        if (cameraKeyPageUpPressed) {
-          KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_UP);
-          cameraKeyPageUpPressed = false;
-        }
-        cameraBudgetY = 0;
-      } else {
-        var drainRateY:Number = 2.2;
-        if (cameraBudgetY > 0.6) {
+      // Drain vertical budget (PageDown/Q, PageUp/E)
+      if (!isVerticalCameraDisabled) {
+        var drainRateY:Number = 1.0;
+        if (cameraBudgetY > 0.4) {
           if (!cameraKeyPageDownPressed) {
             KeyUtil.simulateKeyPress(stage, true, Keyboard.PAGE_DOWN);
+            KeyUtil.simulateKeyPress(stage, true, Keyboard.Q);
             cameraKeyPageDownPressed = true;
           }
           if (cameraKeyPageUpPressed) {
             KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_UP);
+            KeyUtil.simulateKeyPress(stage, false, Keyboard.E);
             cameraKeyPageUpPressed = false;
           }
           var drainY:Number = Math.min(cameraBudgetY, drainRateY);
           cameraBudgetY -= drainY;
-        } else if (cameraBudgetY < -0.6) {
+        } else if (cameraBudgetY < -0.4) {
           if (!cameraKeyPageUpPressed) {
             KeyUtil.simulateKeyPress(stage, true, Keyboard.PAGE_UP);
+            KeyUtil.simulateKeyPress(stage, true, Keyboard.E);
             cameraKeyPageUpPressed = true;
           }
           if (cameraKeyPageDownPressed) {
             KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_DOWN);
+            KeyUtil.simulateKeyPress(stage, false, Keyboard.Q);
             cameraKeyPageDownPressed = false;
           }
           var drainNegY:Number = Math.min(-cameraBudgetY, drainRateY);
@@ -310,20 +341,40 @@ package controls {
         } else {
           if (cameraKeyPageDownPressed) {
             KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_DOWN);
+            KeyUtil.simulateKeyPress(stage, false, Keyboard.Q);
             cameraKeyPageDownPressed = false;
           }
           if (cameraKeyPageUpPressed) {
             KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_UP);
+            KeyUtil.simulateKeyPress(stage, false, Keyboard.E);
             cameraKeyPageUpPressed = false;
           }
           cameraBudgetY = 0;
         }
       }
 
-      // If finger stopped moving while touching, decay budget rapidly
-      if (cameraTouchId != -1 && getTimer() - lastCameraMoveTime > 70) {
-        cameraBudgetX *= 0.35;
-        cameraBudgetY *= 0.35;
+      // If finger stopped moving while touching (holding finger still to stop/aim), clear budget
+      if ((cameraTouchId != -1 || fireAimTouchId != -1) && getTimer() - lastCameraMoveTime > 110) {
+        cameraBudgetX = 0;
+        cameraBudgetY = 0;
+        if (cameraKeyXPressed) {
+          KeyUtil.simulateKeyPress(stage, false, Keyboard.X);
+          cameraKeyXPressed = false;
+        }
+        if (cameraKeyZPressed) {
+          KeyUtil.simulateKeyPress(stage, false, Keyboard.Z);
+          cameraKeyZPressed = false;
+        }
+        if (cameraKeyPageDownPressed) {
+          KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_DOWN);
+          KeyUtil.simulateKeyPress(stage, false, Keyboard.Q);
+          cameraKeyPageDownPressed = false;
+        }
+        if (cameraKeyPageUpPressed) {
+          KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_UP);
+          KeyUtil.simulateKeyPress(stage, false, Keyboard.E);
+          cameraKeyPageUpPressed = false;
+        }
       }
     }
 
@@ -376,6 +427,14 @@ package controls {
       if (button != null) {
         touchStates[touchId] = button;
         setButtonState(button, true);
+
+        // Aim while shooting: dragging on Fire button rotates camera while shooting
+        if (isAimWhileShootingEnabled && (button.getLabel() == 'SPACE' || button.getLabel() == 'FIRE2')) {
+          fireAimTouchId = touchId;
+          fireAimButton = button;
+          fireAimLastX = stageX;
+          fireAimLastY = stageY;
+        }
         return;
       }
 
@@ -385,6 +444,8 @@ package controls {
         touchStates[touchId] = "CAMERA";
         cameraLastX = stageX;
         cameraLastY = stageY;
+        simulatedMouseX = stageX;
+        simulatedMouseY = stageY;
         cameraBudgetX = 0;
         cameraBudgetY = 0;
         lastCameraMoveTime = getTimer();
@@ -403,6 +464,16 @@ package controls {
         return;
       }
 
+      if (touchId == fireAimTouchId && fireAimButton != null) {
+        setButtonState(fireAimButton, true);
+        var fDeltaX:Number = stageX - fireAimLastX;
+        var fDeltaY:Number = stageY - fireAimLastY;
+        fireAimLastX = stageX;
+        fireAimLastY = stageY;
+        applyCameraDelta(fDeltaX, fDeltaY);
+        return;
+      }
+
       var buttonUnderTouch:ControlButton = getButtonAt(stageX, stageY);
       var currentButton:ControlButton = currentTarget as ControlButton;
       if (buttonUnderTouch == currentButton) {
@@ -417,31 +488,75 @@ package controls {
       touchStates[touchId] = buttonUnderTouch;
     }
 
-    private function handleCameraMove(stageX:Number, stageY:Number):void {
-      var deltaX:Number = stageX - cameraLastX;
-      var deltaY:Number = stageY - cameraLastY;
-      cameraLastX = stageX;
-      cameraLastY = stageY;
+    private function applyCameraDelta(deltaX:Number, deltaY:Number):void {
       lastCameraMoveTime = getTimer();
 
       // Normalize by DPI scale so feeling is identical across devices
       var normX:Number = deltaX / DPI.dpiScale;
       var normY:Number = deltaY / DPI.dpiScale;
 
-      // Add to budgets scaled directly by sensitivity multipliers
-      cameraBudgetX += normX * cameraSensH * 3.2;
+      // 1. Mouse distance rotation: dispatch SimulatedMouseEvent with movementX & movementY
+      var moveX:Number = normX * cameraSensH * 2.2;
+      var moveY:Number = isVerticalCameraDisabled ? 0 : (normY * cameraSensV * 1.6);
+
+      simulatedMouseX += moveX;
+      simulatedMouseY += moveY;
+
+      if (stage != null) {
+        if (simulatedMouseX < -1000) simulatedMouseX = 0;
+        else if (simulatedMouseX > stage.stageWidth + 1000) simulatedMouseX = stage.stageWidth;
+        if (simulatedMouseY < -1000) simulatedMouseY = 0;
+        else if (simulatedMouseY > stage.stageHeight + 1000) simulatedMouseY = stage.stageHeight;
+
+        var mouseEvt:SimulatedMouseEvent = new SimulatedMouseEvent(
+          MouseEvent.MOUSE_MOVE,
+          true,
+          false,
+          simulatedMouseX,
+          simulatedMouseY,
+          null,
+          false, false, false, false, 0,
+          moveX,
+          moveY
+        );
+        stage.dispatchEvent(mouseEvt);
+      }
+
+      // 2. Horizontal keyboard rotation assist (Z/X)
+      cameraBudgetX += normX * cameraSensH * 2.0;
+      cameraBudgetX = Math.max(-120, Math.min(120, cameraBudgetX));
+
+      // 3. Vertical keyboard rotation assist (PageDown/Q, PageUp/E)
       if (!isVerticalCameraDisabled) {
-        cameraBudgetY += normY * cameraSensV * 2.2;
-        cameraBudgetY = Math.max(-70, Math.min(70, cameraBudgetY));
+        // Gentle vertical budget: clamp to +/- 5.0 frames max so camera changes "не сильно"
+        cameraBudgetY += normY * cameraSensV * 0.35;
+        cameraBudgetY = Math.max(-5.0, Math.min(5.0, cameraBudgetY));
       } else {
         cameraBudgetY = 0;
       }
+    }
 
-      // Clamp buffer to prevent endless spin on huge gestures
-      cameraBudgetX = Math.max(-120, Math.min(120, cameraBudgetX));
+    private function handleCameraMove(stageX:Number, stageY:Number):void {
+      var deltaX:Number = stageX - cameraLastX;
+      var deltaY:Number = stageY - cameraLastY;
+      cameraLastX = stageX;
+      cameraLastY = stageY;
+
+      applyCameraDelta(deltaX, deltaY);
     }
 
     private function handleTouchEnd(touchId:int):void {
+      if (touchId == fireAimTouchId) {
+        if (fireAimButton != null) {
+          setButtonState(fireAimButton, false);
+          fireAimButton = null;
+        }
+        fireAimTouchId = -1;
+        delete touchStates[touchId];
+        releaseCameraKeys();
+        return;
+      }
+
       var currentTarget:Object = touchStates[touchId];
       if (currentTarget == joystick) {
         joystick.onTouchEnd(touchId);
@@ -474,10 +589,12 @@ package controls {
       }
       if (cameraKeyPageUpPressed) {
         KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_UP);
+        KeyUtil.simulateKeyPress(stage, false, Keyboard.E);
         cameraKeyPageUpPressed = false;
       }
       if (cameraKeyPageDownPressed) {
         KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_DOWN);
+        KeyUtil.simulateKeyPress(stage, false, Keyboard.Q);
         cameraKeyPageDownPressed = false;
       }
     }
@@ -495,6 +612,7 @@ package controls {
     private function createControls():void {
       // 1. Virtual Joystick
       joystick = new VirtualJoystick(stage);
+      joystick.setJoystickSens(joystickSens);
       var joyPos:Point = defaultPositions['JOYSTICK'];
       joystick.x = joyPos.x;
       joystick.y = joyPos.y;
@@ -521,6 +639,8 @@ package controls {
       createControl(this, 'Z', Keyboard.Z, 0, buttonSizes[1], buttonSizes[1]);
       createControl(this, 'X', Keyboard.X, 0, buttonSizes[1], buttonSizes[1]);
       createControl(this, 'C', Keyboard.C, 0, buttonSizes[0], buttonSizes[0]);
+      createControl(this, 'Q', Keyboard.Q, 0, buttonSizes[1], buttonSizes[1]);
+      createControl(this, 'E', Keyboard.E, 0, buttonSizes[1], buttonSizes[1]);
 
       // Secondary Fire button (above joystick, fires SPACE)
       createControl(this, 'FIRE2', Keyboard.SPACE, 0, buttonSizes[1], buttonSizes[1], 'FIRE');
@@ -780,6 +900,7 @@ package controls {
       }
       storage.data.positions = positions;
       storage.data.buttonScales = buttonScales;
+      storage.data.joystickSens = joystickSens;
       storage.flush();
     }
 
@@ -863,6 +984,18 @@ package controls {
 
       if (storage.data.disableVerticalCamera != undefined) {
         setVerticalCameraDisabled(storage.data.disableVerticalCamera);
+      }
+
+      if (storage.data.joystickSens != undefined) {
+        setJoystickSens(Number(storage.data.joystickSens));
+      }
+
+      if (storage.data.showQEButtons != undefined) {
+        setQEButtonsEnabled(storage.data.showQEButtons);
+      }
+
+      if (storage.data.aimWhileShooting != undefined) {
+        setAimWhileShooting(storage.data.aimWhileShooting);
       }
     }
 
@@ -974,10 +1107,12 @@ package controls {
       if (disabled) {
         if (cameraKeyPageDownPressed) {
           KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_DOWN);
+          KeyUtil.simulateKeyPress(stage, false, Keyboard.Q);
           cameraKeyPageDownPressed = false;
         }
         if (cameraKeyPageUpPressed) {
           KeyUtil.simulateKeyPress(stage, false, Keyboard.PAGE_UP);
+          KeyUtil.simulateKeyPress(stage, false, Keyboard.E);
           cameraKeyPageUpPressed = false;
         }
         cameraBudgetY = 0;
@@ -991,6 +1126,36 @@ package controls {
       return isVerticalCameraDisabled;
     }
 
+    public function setQEButtonsEnabled(enabled:Boolean):void {
+      isQEButtonsEnabled = enabled;
+      updateControlsVisibility();
+      var storage:SharedObject = SharedObject.getLocal('storage');
+      storage.data.showQEButtons = enabled;
+      storage.flush();
+    }
+
+    public function getQEButtonsEnabled():Boolean {
+      return isQEButtonsEnabled;
+    }
+
+    public function setAimWhileShooting(enabled:Boolean):void {
+      isAimWhileShootingEnabled = enabled;
+      if (!enabled && fireAimTouchId != -1) {
+        if (fireAimButton != null) {
+          setButtonState(fireAimButton, false);
+          fireAimButton = null;
+        }
+        fireAimTouchId = -1;
+      }
+      var storage:SharedObject = SharedObject.getLocal('storage');
+      storage.data.aimWhileShooting = enabled;
+      storage.flush();
+    }
+
+    public function getAimWhileShooting():Boolean {
+      return isAimWhileShootingEnabled;
+    }
+
     public function getControlsEnabled():Boolean { return controlsEnabled; }
     public function getJoystickEnabled():Boolean { return isJoystickEnabled; }
     public function getDpadEnabled():Boolean { return isDpadEnabled; }
@@ -1001,6 +1166,17 @@ package controls {
     public function getCameraSensV():Number { return cameraSensV; }
     public function getButtonScale():Number { return buttonScale; }
     public function getJoystickScale():Number { return joystickScale; }
+    public function getJoystickSens():Number { return joystickSens; }
+
+    public function setJoystickSens(sens:Number):void {
+      this.joystickSens = sens;
+      if (joystick != null) {
+        joystick.setJoystickSens(sens);
+      }
+      var storage:SharedObject = SharedObject.getLocal('storage');
+      storage.data.joystickSens = sens;
+      storage.flush();
+    }
 
     public function exportSettingsJson():String {
       var sw:Number = stage.stageWidth;
@@ -1045,6 +1221,7 @@ package controls {
         buttonScales: buttonScales,
         buttonScale: Number(buttonScale.toFixed(2)),
         joystickScale: Number(joystickScale.toFixed(2)),
+        joystickSens: Number(joystickSens.toFixed(2)),
         buttonsAlpha: Number(buttonsAlpha.toFixed(2)),
         cameraSensH: Number(cameraSensH.toFixed(2)),
         cameraSensV: Number(cameraSensV.toFixed(2)),
@@ -1055,7 +1232,9 @@ package controls {
         showDpad: isDpadEnabled,
         touchCamera: isTouchCameraEnabled,
         showTurret: isTurretButtonsEnabled,
+        showQE: isQEButtonsEnabled,
         showFire2: isFire2Enabled,
+        aimWhileShooting: isAimWhileShootingEnabled,
         customButtons: customList
       };
 
@@ -1137,6 +1316,7 @@ package controls {
 
         // 4. Alpha & Sensitivity
         if (data.buttonsAlpha != null) setButtonsAlpha(Number(data.buttonsAlpha));
+        if (data.joystickSens != null) setJoystickSens(Number(data.joystickSens));
         if (data.cameraSensH != null) setCameraSensH(Number(data.cameraSensH));
         if (data.cameraSensV != null) setCameraSensV(Number(data.cameraSensV));
         if (data.disableVertCam != null) setVerticalCameraDisabled(Boolean(data.disableVertCam));
@@ -1148,7 +1328,9 @@ package controls {
         if (data.showDpad != null) setDpadEnabled(Boolean(data.showDpad));
         if (data.touchCamera != null) setTouchCameraEnabled(Boolean(data.touchCamera));
         if (data.showTurret != null) setTurretButtonsEnabled(Boolean(data.showTurret));
+        if (data.showQE != null) setQEButtonsEnabled(Boolean(data.showQE));
         if (data.showFire2 != null) setFire2Enabled(Boolean(data.showFire2));
+        if (data.aimWhileShooting != null) setAimWhileShooting(Boolean(data.aimWhileShooting));
 
         savePositions();
         saveCustomButtons();
@@ -1175,6 +1357,8 @@ package controls {
           button.visible = isDpadEnabled;
         } else if (label == 'Z' || label == 'X' || label == 'C') {
           button.visible = controlsEnabled && isTurretButtonsEnabled;
+        } else if (label == 'Q' || label == 'E') {
+          button.visible = controlsEnabled && isQEButtonsEnabled;
         } else if (label == 'FIRE2') {
           button.visible = controlsEnabled && isFire2Enabled;
         } else if (label == '2' || label == '3' || label == '4') {

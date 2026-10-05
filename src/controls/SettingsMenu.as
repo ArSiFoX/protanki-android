@@ -34,6 +34,7 @@ package controls {
     // Tabs
     private var tabButtons:Vector.<Sprite> = new Vector.<Sprite>();
     private var tabContainers:Vector.<Sprite> = new Vector.<Sprite>();
+    private var tabHeights:Vector.<Number> = new Vector.<Number>();
     private var currentTabIndex:int = 0;
 
     // Viewport & Scroll
@@ -45,6 +46,9 @@ package controls {
     private var isScrolling:Boolean = false;
     private var scrollStartMouseY:Number = 0;
     private var scrollStartScrollY:Number = 0;
+    private var isDraggingScrollbar:Boolean = false;
+    private var scrollbarStartMouseY:Number = 0;
+    private var scrollbarStartScrollY:Number = 0;
 
     // Tab 1: Controls
     private var showControlsCheckbox:Checkbox;
@@ -52,8 +56,11 @@ package controls {
     private var showDpadCheckbox:Checkbox;
     private var touchCameraCheckbox:Checkbox;
     private var showTurretCheckbox:Checkbox;
+    private var showQECheckbox:Checkbox;
     private var showFire2Checkbox:Checkbox;
     private var combineSuppliesCheckbox:Checkbox;
+    private var joystickSensLabel:TextLabel;
+    private var joystickSensSlider:NormalSlider;
 
     // Tab 2: Sizes
     private var selectedButtonLabel:TextLabel;
@@ -68,6 +75,7 @@ package controls {
 
     // Tab 3: Camera
     private var disableVertCamCheckbox:Checkbox;
+    private var aimWhileShootingCheckbox:Checkbox;
     private var sensHLabel:TextLabel;
     private var sensHSlider:NormalSlider;
     private var sensVLabel:TextLabel;
@@ -142,6 +150,9 @@ package controls {
 
       // Viewport container
       viewportHolder = new Sprite();
+      viewportHolder.graphics.beginFill(0x000000, 0.0);
+      viewportHolder.graphics.drawRect(0, 0, menuW, viewportH);
+      viewportHolder.graphics.endFill();
       viewportHolder.x = 0;
       viewportHolder.y = titleH + tabH;
       addChild(viewportHolder);
@@ -305,6 +316,17 @@ package controls {
       cont.addChild(lbl5);
       curY += rowGap;
 
+      showQECheckbox = new Checkbox();
+      showQECheckbox.x = cbX;
+      showQECheckbox.y = curY;
+      showQECheckbox.addEventListener(MouseEvent.CLICK, onShowQEChange);
+      cont.addChild(showQECheckbox);
+      var lblQE:TextLabel = new TextLabel(t('show_qe_buttons'), DPI.scale(11));
+      lblQE.x = showQECheckbox.x + showQECheckbox.width + DPI.scale(8);
+      lblQE.y = showQECheckbox.y + DPI.scale(2);
+      cont.addChild(lblQE);
+      curY += rowGap;
+
       showFire2Checkbox = new Checkbox();
       showFire2Checkbox.x = cbX;
       showFire2Checkbox.y = curY;
@@ -325,9 +347,24 @@ package controls {
       lbl7.x = combineSuppliesCheckbox.x + combineSuppliesCheckbox.width + DPI.scale(8);
       lbl7.y = combineSuppliesCheckbox.y + DPI.scale(2);
       cont.addChild(lbl7);
-      curY += rowGap + DPI.scale(12);
+      curY += rowGap + DPI.scale(4);
 
-      registerTabContainer(cont, curY);
+      joystickSensLabel = new TextLabel(t('joystick_sens') + ': 100%', DPI.scale(11), 0x55CCFF);
+      joystickSensLabel.x = cbX;
+      joystickSensLabel.y = curY;
+      cont.addChild(joystickSensLabel);
+
+      curY += DPI.scale(17);
+      var sliderWidthUnscaled:Number = 296;
+      joystickSensSlider = new NormalSlider(sliderWidthUnscaled);
+      joystickSensSlider.x = cbX;
+      joystickSensSlider.y = curY;
+      joystickSensSlider.value = 0.444;
+      joystickSensSlider.addEventListener(Event.CHANGE, onJoystickSensChange);
+      cont.addChild(joystickSensSlider);
+      curY += DPI.scale(26);
+
+      registerTabContainer(cont, curY + DPI.scale(10));
     }
 
     // --- TAB 2: SIZES & OPACITY ---
@@ -399,7 +436,7 @@ package controls {
       cont.addChild(alphaSlider);
       curY += DPI.scale(24);
 
-      registerTabContainer(cont, curY);
+      registerTabContainer(cont, curY + DPI.scale(10));
     }
 
     // --- TAB 3: CAMERA ---
@@ -418,6 +455,17 @@ package controls {
       lblVert.x = disableVertCamCheckbox.x + disableVertCamCheckbox.width + DPI.scale(8);
       lblVert.y = disableVertCamCheckbox.y + DPI.scale(2);
       cont.addChild(lblVert);
+      curY += DPI.scale(26);
+
+      aimWhileShootingCheckbox = new Checkbox();
+      aimWhileShootingCheckbox.x = cbX;
+      aimWhileShootingCheckbox.y = curY;
+      aimWhileShootingCheckbox.addEventListener(MouseEvent.CLICK, onAimWhileShootingChange);
+      cont.addChild(aimWhileShootingCheckbox);
+      var lblAim:TextLabel = new TextLabel(t('aim_while_shooting'), DPI.scale(11), 0xFFD700);
+      lblAim.x = aimWhileShootingCheckbox.x + aimWhileShootingCheckbox.width + DPI.scale(8);
+      lblAim.y = aimWhileShootingCheckbox.y + DPI.scale(2);
+      cont.addChild(lblAim);
       curY += DPI.scale(26);
 
       sensHLabel = new TextLabel(t('camera_sens_h') + ': 100%', DPI.scale(11));
@@ -448,7 +496,7 @@ package controls {
       cont.addChild(sensVSlider);
       curY += DPI.scale(25);
 
-      registerTabContainer(cont, curY);
+      registerTabContainer(cont, curY + DPI.scale(10));
     }
 
     // --- TAB 4: CUSTOM BUTTONS ---
@@ -516,7 +564,7 @@ package controls {
       cont.addChild(inputRow);
       curY += DPI.scale(32);
 
-      registerTabContainer(cont, curY);
+      registerTabContainer(cont, curY + DPI.scale(10));
     }
 
     // --- TAB 5: PROFILE (IMPORT / EXPORT / RESET) ---
@@ -583,19 +631,30 @@ package controls {
       cont.addChild(resetBtn);
 
       curY += DPI.scale(28);
-      registerTabContainer(cont, curY);
+      registerTabContainer(cont, curY + DPI.scale(10));
     }
 
     private function registerTabContainer(cont:Sprite, totalHeight:Number):void {
       cont.visible = false;
       viewportHolder.addChild(cont);
       tabContainers.push(cont);
+      tabHeights.push(totalHeight);
 
       var scrollbar:Sprite = new Sprite();
-      scrollbar.x = menuW - DPI.scale(7);
+      scrollbar.x = menuW - DPI.scale(10);
       scrollbar.y = titleH + tabH + DPI.scale(2);
+      scrollbar.buttonMode = true;
+      scrollbar.addEventListener(MouseEvent.MOUSE_DOWN, onScrollbarDown);
+      scrollbar.addEventListener(TouchEvent.TOUCH_BEGIN, onScrollbarTouchDown);
       addChild(scrollbar);
       scrollbars.push(scrollbar);
+    }
+
+    private function getActiveContentHeight():Number {
+      if (currentTabIndex >= 0 && currentTabIndex < tabHeights.length) {
+        return tabHeights[currentTabIndex];
+      }
+      return viewportH;
     }
 
     // --- Import / Export Handlers ---
@@ -644,6 +703,11 @@ package controls {
 
     private function onDisableVertCamChange(event:MouseEvent):void {
       onScreenControls.setVerticalCameraDisabled(disableVertCamCheckbox.checked);
+      saveSettings();
+    }
+
+    private function onAimWhileShootingChange(event:MouseEvent):void {
+      onScreenControls.setAimWhileShooting(aimWhileShootingCheckbox.checked);
       saveSettings();
     }
 
@@ -779,7 +843,7 @@ package controls {
 
     private function setScrollY(newY:Number):void {
       if (activeScrollContainer == null) return;
-      var totalH:Number = activeScrollContainer.height;
+      var totalH:Number = getActiveContentHeight();
       maxScroll = Math.max(0, totalH - viewportH);
       scrollY = Math.max(0, Math.min(maxScroll, newY));
       updateScroll();
@@ -787,7 +851,7 @@ package controls {
 
     private function updateScroll():void {
       if (activeScrollContainer == null) return;
-      var totalH:Number = activeScrollContainer.height;
+      var totalH:Number = getActiveContentHeight();
       maxScroll = Math.max(0, totalH - viewportH);
       activeScrollContainer.scrollRect = new Rectangle(0, scrollY, menuW - DPI.scale(10), viewportH);
 
@@ -796,21 +860,89 @@ package controls {
         sb.graphics.clear();
         if (maxScroll > 0) {
           sb.visible = true;
-          // Track
+          // Hit area & Track
+          var barW:Number = DPI.scale(6);
+          sb.graphics.beginFill(0x000000, 0.01);
+          sb.graphics.drawRect(-DPI.scale(8), 0, barW + DPI.scale(12), viewportH);
           sb.graphics.beginFill(0x333333, 0.6);
-          sb.graphics.drawRoundRect(0, 0, DPI.scale(4), viewportH, DPI.scale(2), DPI.scale(2));
+          sb.graphics.drawRoundRect(0, 0, barW, viewportH, DPI.scale(3), DPI.scale(3));
           sb.graphics.endFill();
 
           // Thumb
-          var thumbH:Number = Math.max(DPI.scale(18), (viewportH / totalH) * viewportH);
-          var ratio:Number = scrollY / maxScroll;
+          var thumbH:Number = Math.max(DPI.scale(22), (viewportH / totalH) * viewportH);
+          var ratio:Number = maxScroll > 0 ? (scrollY / maxScroll) : 0;
           var thumbY:Number = ratio * (viewportH - thumbH);
           sb.graphics.beginFill(0x888888, 0.9);
-          sb.graphics.drawRoundRect(0, thumbY, DPI.scale(4), thumbH, DPI.scale(2), DPI.scale(2));
+          sb.graphics.drawRoundRect(0, thumbY, barW, thumbH, DPI.scale(3), DPI.scale(3));
           sb.graphics.endFill();
         } else {
           sb.visible = false;
         }
+      }
+    }
+
+    private function onScrollbarDown(event:MouseEvent):void {
+      startScrollbarDrag(mouseY);
+    }
+
+    private function onScrollbarTouchDown(event:TouchEvent):void {
+      var pt:Point = globalToLocal(new Point(event.stageX, event.stageY));
+      startScrollbarDrag(pt.y);
+    }
+
+    private function startScrollbarDrag(startY:Number):void {
+      isDraggingScrollbar = true;
+      scrollbarStartMouseY = startY;
+      scrollbarStartScrollY = scrollY;
+      if (stage != null) {
+        stage.addEventListener(MouseEvent.MOUSE_MOVE, onStageScrollbarMove);
+        stage.addEventListener(MouseEvent.MOUSE_UP, onStageScrollbarEnd);
+        stage.addEventListener(TouchEvent.TOUCH_MOVE, onStageTouchScrollbarMove);
+        stage.addEventListener(TouchEvent.TOUCH_END, onStageTouchScrollbarEnd);
+      }
+    }
+
+    private function onStageScrollbarMove(event:MouseEvent):void {
+      if (isDraggingScrollbar) {
+        updateScrollbarDrag(mouseY);
+      }
+    }
+
+    private function onStageTouchScrollbarMove(event:TouchEvent):void {
+      if (isDraggingScrollbar) {
+        var pt:Point = globalToLocal(new Point(event.stageX, event.stageY));
+        updateScrollbarDrag(pt.y);
+      }
+    }
+
+    private function updateScrollbarDrag(currY:Number):void {
+      var totalH:Number = getActiveContentHeight();
+      var maxS:Number = Math.max(0, totalH - viewportH);
+      if (maxS <= 0) return;
+      var thumbH:Number = Math.max(DPI.scale(22), (viewportH / totalH) * viewportH);
+      var trackH:Number = viewportH - thumbH;
+      if (trackH <= 0) return;
+      var deltaY:Number = currY - scrollbarStartMouseY;
+      var targetScroll:Number = scrollbarStartScrollY + (deltaY / trackH) * maxS;
+      setScrollY(targetScroll);
+    }
+
+    private function onStageScrollbarEnd(event:MouseEvent):void {
+      stopScrollbarDrag();
+    }
+
+    private function onStageTouchScrollbarEnd(event:TouchEvent):void {
+      stopScrollbarDrag();
+    }
+
+    private function stopScrollbarDrag():void {
+      if (!isDraggingScrollbar) return;
+      isDraggingScrollbar = false;
+      if (stage != null) {
+        stage.removeEventListener(MouseEvent.MOUSE_MOVE, onStageScrollbarMove);
+        stage.removeEventListener(MouseEvent.MOUSE_UP, onStageScrollbarEnd);
+        stage.removeEventListener(TouchEvent.TOUCH_MOVE, onStageTouchScrollbarMove);
+        stage.removeEventListener(TouchEvent.TOUCH_END, onStageTouchScrollbarEnd);
       }
     }
 
@@ -890,6 +1022,11 @@ package controls {
       saveSettings();
     }
 
+    private function onShowQEChange(event:MouseEvent):void {
+      onScreenControls.setQEButtonsEnabled(showQECheckbox.checked);
+      saveSettings();
+    }
+
     private function onShowFire2Change(event:MouseEvent):void {
       onScreenControls.setFire2Enabled(showFire2Checkbox.checked);
       saveSettings();
@@ -944,6 +1081,13 @@ package controls {
       saveSettings();
     }
 
+    private function onJoystickSensChange(event:Event):void {
+      var mult:Number = 0.2 + joystickSensSlider.value * 1.8;
+      joystickSensLabel.text = t('joystick_sens') + ': ' + Math.round(mult * 100) + '%';
+      onScreenControls.setJoystickSens(mult);
+      saveSettings();
+    }
+
     private function onAlphaChange(event:Event):void {
       var newAlpha:Number = alphaSlider.value;
       settingsButton.alpha = newAlpha;
@@ -962,6 +1106,10 @@ package controls {
       joystickSizeLabel.text = t('joystick_size') + ': 100%';
       onScreenControls.setJoystickScale(1.0);
 
+      joystickSensSlider.value = (1.0 - 0.2) / 1.8;
+      joystickSensLabel.text = t('joystick_sens') + ': 100%';
+      onScreenControls.setJoystickSens(1.0);
+
       buttonsAlphaSlider.value = 1.0;
       buttonsAlphaLabel.text = t('buttons_opacity') + ': 100%';
       onScreenControls.setButtonsAlpha(1.0);
@@ -977,6 +1125,12 @@ package controls {
       disableVertCamCheckbox.checked = false;
       onScreenControls.setVerticalCameraDisabled(false);
 
+      showQECheckbox.checked = false;
+      onScreenControls.setQEButtonsEnabled(false);
+
+      aimWhileShootingCheckbox.checked = true;
+      onScreenControls.setAimWhileShooting(true);
+
       showStatus(t('reset_buttons_position'), 0x66B2FF);
       saveSettings();
     }
@@ -988,7 +1142,9 @@ package controls {
       var showDpad:Boolean = storage.data.showDpad ?? false;
       var touchCamera:Boolean = storage.data.touchCamera ?? true;
       var showTurret:Boolean = storage.data.showTurretButtons ?? true;
+      var showQE:Boolean = storage.data.showQEButtons ?? false;
       var showFire2:Boolean = storage.data.showFire2 ?? true;
+      var aimWhileShooting:Boolean = storage.data.aimWhileShooting ?? true;
       var combineSupplies:Boolean = storage.data.combineSupplies ?? false;
       var disableVertCam:Boolean = storage.data.disableVerticalCamera ?? false;
 
@@ -997,12 +1153,15 @@ package controls {
       showDpadCheckbox.checked = showDpad;
       touchCameraCheckbox.checked = touchCamera;
       showTurretCheckbox.checked = showTurret;
+      showQECheckbox.checked = showQE;
       showFire2Checkbox.checked = showFire2;
+      aimWhileShootingCheckbox.checked = aimWhileShooting;
       combineSuppliesCheckbox.checked = combineSupplies;
       disableVertCamCheckbox.checked = disableVertCam;
 
       var btnScale:Number = storage.data.buttonScale ?? 1.0;
       var joyScale:Number = storage.data.joystickScale ?? 1.0;
+      var joySens:Number = storage.data.joystickSens ?? 1.0;
       var bAlpha:Number = storage.data.buttonsAlpha ?? 1.0;
       var sensH:Number = storage.data.cameraSensH ?? 1.0;
       var sensV:Number = storage.data.cameraSensV ?? 1.0;
@@ -1014,6 +1173,10 @@ package controls {
       joystickSizeSlider.value = (joyScale - 0.6) / 1.0;
       joystickSizeLabel.text = t('joystick_size') + ': ' + Math.round(joyScale * 100) + '%';
       onScreenControls.setJoystickScale(joyScale);
+
+      joystickSensSlider.value = (joySens - 0.2) / 1.8;
+      joystickSensLabel.text = t('joystick_sens') + ': ' + Math.round(joySens * 100) + '%';
+      onScreenControls.setJoystickSens(joySens);
 
       buttonsAlphaSlider.value = (bAlpha - 0.15) / 0.85;
       buttonsAlphaLabel.text = t('buttons_opacity') + ': ' + Math.round(bAlpha * 100) + '%';
@@ -1028,7 +1191,9 @@ package controls {
       onScreenControls.setCameraSensV(sensV);
 
       onScreenControls.setTurretButtonsEnabled(showTurret);
+      onScreenControls.setQEButtonsEnabled(showQE);
       onScreenControls.setFire2Enabled(showFire2);
+      onScreenControls.setAimWhileShooting(aimWhileShooting);
       onScreenControls.setTouchCameraEnabled(touchCamera);
       onScreenControls.setJoystickEnabled(showJoystick);
       onScreenControls.setDpadEnabled(showDpad);
@@ -1050,11 +1215,14 @@ package controls {
       storage.data.showDpad = showDpadCheckbox.checked;
       storage.data.touchCamera = touchCameraCheckbox.checked;
       storage.data.showTurretButtons = showTurretCheckbox.checked;
+      storage.data.showQEButtons = showQECheckbox.checked;
       storage.data.showFire2 = showFire2Checkbox.checked;
+      storage.data.aimWhileShooting = aimWhileShootingCheckbox.checked;
       storage.data.combineSupplies = combineSuppliesCheckbox.checked;
       storage.data.disableVerticalCamera = disableVertCamCheckbox.checked;
       storage.data.buttonScale = 0.6 + buttonSizeSlider.value * 1.0;
       storage.data.joystickScale = 0.6 + joystickSizeSlider.value * 1.0;
+      storage.data.joystickSens = 0.2 + joystickSensSlider.value * 1.8;
       storage.data.buttonsAlpha = 0.15 + buttonsAlphaSlider.value * 0.85;
       storage.data.cameraSensH = 0.2 + sensHSlider.value * 3.8;
       storage.data.cameraSensV = 0.2 + sensVSlider.value * 3.8;
