@@ -62,6 +62,7 @@ You will be prompted for the certificate password during the build process.
 </br>
 
 ![On-screen controls](screenshots/controls.png)
+![On-screen controls](screenshots/settings.jpg)
 
 </br>
 
